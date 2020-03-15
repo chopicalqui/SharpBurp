@@ -1,0 +1,46 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="SharpBurp.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="BurpUrl" Type="System.String" Scope="User">
+      <Value Profile="(Default)">http://127.0.0.1:1337</Value>
+    </Setting>
+    <Setting Name="ApiKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SelectedScanConfiguration" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="ScanConfigurations" Type="System.Collections.Specialized.StringCollection" Scope="Application">
+      <Value Profile="(Default)">&lt;?xml version="1.0" encoding="utf-16"?&gt;
+&lt;ArrayOfString xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"&gt;
+  &lt;string&gt;Add all links to site map&lt;/string&gt;
+  &lt;string&gt;Add requested item to site map&lt;/string&gt;
+  &lt;string&gt;Audit checks - all except JavaScript analysis&lt;/string&gt;
+  &lt;string&gt;Audit checks - all except time-based detection methods&lt;/string&gt;
+  &lt;string&gt;Audit checks - critical issues only&lt;/string&gt;
+  &lt;string&gt;Audit checks - extensions only&lt;/string&gt;
+  &lt;string&gt;Audit checks - light active&lt;/string&gt;
+  &lt;string&gt;Audit checks - medium active&lt;/string&gt;
+  &lt;string&gt;Audit checks - passive&lt;/string&gt;
+  &lt;string&gt;Audit coverage - maximum&lt;/string&gt;
+  &lt;string&gt;Audit coverage - thorough&lt;/string&gt;
+  &lt;string&gt;Crawl limit - 10 minutes&lt;/string&gt;
+  &lt;string&gt;Crawl limit - 30 minutes&lt;/string&gt;
+  &lt;string&gt;Crawl limit - 60 minutes&lt;/string&gt;
+  &lt;string&gt;Crawl strategy - faster&lt;/string&gt;
+  &lt;string&gt;Crawl strategy - fastest&lt;/string&gt;
+  &lt;string&gt;Crawl strategy - more complete&lt;/string&gt;
+  &lt;string&gt;Crawl strategy - most complete&lt;/string&gt;
+  &lt;string&gt;HTTP Request Smuggling&lt;/string&gt;
+  &lt;string&gt;Minimize false negatives&lt;/string&gt;
+  &lt;string&gt;Minimize false positives&lt;/string&gt;
+  &lt;string&gt;Never stop audit due to application errors&lt;/string&gt;
+  &lt;string&gt;Never stop crawl due to application errors&lt;/string&gt;
+&lt;/ArrayOfString&gt;</Value>
+    </Setting>
+    <Setting Name="ResourcePool" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Default resource pool</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
