@@ -12,7 +12,7 @@ depicted in the following screenshot:
 During BurpSuite's setup, copy the configuration to SharpBurp as depicted 
 in the following screenshot. Note that SharpBurp will permanently 
 store all configuration:
-![SharpBurp configuration to interact with BurpSuite](Resources/burpsuite_config.png)
+![SharpBurp configuration to interact with BurpSuite](Resources/sharpburp_config.png)
 
 ## Usage
 
