@@ -42,5 +42,8 @@
     <Setting Name="ResourcePool" Type="System.String" Scope="User">
       <Value Profile="(Default)">Default resource pool</Value>
     </Setting>
+    <Setting Name="ChunkSize" Type="System.Decimal" Scope="User">
+      <Value Profile="(Default)">10</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

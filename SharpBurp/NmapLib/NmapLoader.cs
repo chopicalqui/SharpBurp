@@ -2,57 +2,178 @@
 using System.Collections.Generic;
 using System.Xml;
 using System.Text.RegularExpressions;
+using System.ComponentModel;
 
 namespace NmapLib
 {
+	public enum ServiceProtocol
+	{
+		tcp,
+		udp
+	};
+
+	public enum ServiceState
+	{
+		open,
+		closed,
+		filtered,
+		openFiltered,
+		closedFiltered
+	};
+
 	public class NmapEntry
 	{
-		public string Protocol { get; set; }
-		public string State { get; set; }
+		public bool scan { get; set; }
+		public string Host { get; set; }
+		public ServiceProtocol protocol { get; set; }
+		private ServiceState state { get; set; }
 		public int Port { get; set; }
 		public bool Tls { get; set; }
-		public string NmapNameNew { get; set; }
+		private string nmapNameNew { get; set; }
 		public string NmapNameOriginal { get; set; }
 		public string Version { get; set; }
 		public int Confidence { get; set; }
 		public string OsType { get; set; }
 
+		public NmapEntry()
+		{
+		}
+
+		public NmapEntry(NmapEntry entry)
+		{
+			this.Host = entry.Host;
+			this.Protocol = entry.Protocol;
+			this.State = entry.State;
+			this.Port = entry.Port;
+			this.Tls = entry.Tls;
+			this.NmapNameNew = entry.NmapNameNew;
+			this.NmapNameOriginal = entry.NmapNameOriginal;
+			this.Version = entry.Version;
+			this.Confidence = entry.Confidence;
+			this.OsType = entry.OsType;
+			this.Scan = entry.Scan;
+		}
+
+		public NmapEntry(string host, NmapEntry entry) : this(entry)
+		{
+			this.Host = host;
+		}
+
 		public NmapEntry(string protocol, int port, string state, string nmapNameNew, string nmapNameOriginal, string version, bool tls, int confidence, string osType)
 		{
-			this.Protocol = protocol;
+			if (protocol == "tcp")
+				this.Protocol = ServiceProtocol.tcp;
+			else if (protocol == "udp")
+				this.Protocol = ServiceProtocol.udp;
+			else
+				throw new NotImplementedException(String.Format("ServiceProtocol '{0}' not implemented.", protocol));
+			if (state == "open")
+				this.State = ServiceState.open;
+			else if (state == "closed")
+				this.State = ServiceState.closed;
+			else if (state == "filtered")
+				this.State = ServiceState.filtered;
+			else if (state == "open|filtered")
+				this.State = ServiceState.openFiltered;
+			else if (state == "closed|filtered")
+				this.State = ServiceState.closedFiltered;
+			else
+				throw new NotImplementedException(String.Format("Service state '{0}' not implemented.", state));
 			this.Port = port;
-			this.State = state;
-			this.NmapNameNew = nmapNameNew;
-			this.NmapNameOriginal = confidence != 10 ? nmapNameOriginal + "?" : nmapNameOriginal;
+			this.NmapNameNew = confidence != 10 && !string.IsNullOrEmpty(nmapNameNew) ? nmapNameNew + "?" : nmapNameNew;
+			this.NmapNameOriginal = confidence != 10 && !string.IsNullOrEmpty(nmapNameOriginal) ? nmapNameOriginal + "?" : nmapNameOriginal;
 			this.Version = version;
 			this.Confidence = confidence;
 			this.OsType = osType;
 			this.Tls = tls;
 		}
 
-		public object[] GetList(string host)
+		public bool Scan
 		{
-			return new object[] { this.NmapNameNew == "http" && this.State == "open"
-				, host
-				, this.Protocol
-				, this.Port
-				, this.State
-				, this.Tls
-				, string.IsNullOrEmpty(this.NmapNameNew) ? "" : this.NmapNameNew
-				, string.IsNullOrEmpty(this.NmapNameOriginal) ? "" : this.NmapNameOriginal
-				, string.IsNullOrEmpty(this.Version) ? "" : this.Version
-				, string.IsNullOrEmpty(this.OsType) ? "" : this.OsType};
+			get { return this.scan; }
+			set {
+				if (value && !this.IsScanable())
+					throw new Exception("Service cannot be scanned.");
+				this.scan = value;
+			}
+		}
+
+		public string NmapNameNew
+		{
+			get { return this.nmapNameNew; }
+			set
+			{
+				this.nmapNameNew = value;
+				this.scan = this.IsScanable();
+			}
+		}
+
+		public ServiceState State
+		{
+			get { return this.state; }
+			set {
+				this.state = value;
+				this.scan = this.IsScanable();
+			}
+		}
+
+		public ServiceProtocol Protocol
+		{
+			get { return this.protocol; }
+			set
+			{
+				this.protocol = value;
+				this.scan = this.IsScanable();
+			}
+		}
+
+		public Uri Url
+		{
+			get
+			{
+				Uri result = null;
+				if (this.IsScanable())
+				{
+					if ((this.Tls && this.Port == 443) || (!this.Tls && this.Port == 80))
+					{
+						result = new Uri(String.Format("{0}://{1}"
+									, (this.Tls ? "https" : "http")
+									, this.Host));
+					}
+					else
+					{
+						result = new Uri(String.Format("{0}://{1}:{2}"
+									, (this.Tls ? "https" : "http")
+									, this.Host
+									, this.Port));
+					}
+				}
+				return result;
+			}
+		}
+
+		public bool IsScanable()
+		{
+			return this.NmapNameNew == "http" && this.State == ServiceState.open && this.Protocol == ServiceProtocol.tcp;
+		}
+
+		public bool HasState(List<ServiceState> states)
+		{
+			return states.Contains(this.State);
 		}
 	}
 
-    public class NmapLoader : Dictionary<string, List<NmapEntry>>
+    public class NmapLoader : SortableBindingList<NmapEntry>
     {
 		protected string[] Files { get;  }
+		protected List<ServiceState> States { get;  }
 		protected Regex HttpResponseRegex { get; }
 
-		public NmapLoader(string[] files)
+		public NmapLoader(string[] files, List<ServiceState> states)
 		{
+			this.RaiseListChangedEvents = true;
 			this.Files = files;
+			this.States = states;
 			this.HttpResponseRegex = new Regex(@"HTTP/\d+\.\d+ \d{3} [a-zA-Z]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 		}
 
@@ -96,12 +217,13 @@ namespace NmapLib
 				int convidence = this.GetAttributeInt(nodeService, "conf");
 				string productVersion = null;
 				string scriptOutput = this.GetAttributeString(nodeScript, "output");
-				if (serviceName == "https" || serviceName == "https-alt")
+
+				if (Properties.Settings.Default.HttpsNmapServiceNames.Contains(serviceName))
 				{
 					tls = true;
 					serviceNameNew = "http";
 				}
-				else if (serviceName == "http-proxy")
+				else if (Properties.Settings.Default.HttpNmapServiceNames.Contains(serviceName))
 				{
 					serviceNameNew = "http";
 				}
@@ -123,7 +245,8 @@ namespace NmapLib
 					productVersion = version;
 				}
 				NmapEntry nmapEntry = new NmapEntry(protocol, port, state, serviceNameNew, serviceName, productVersion, tls, convidence, osType);
-				result.Add(nmapEntry);
+				if (nmapEntry.HasState(this.States))
+					result.Add(nmapEntry);
 			}
 			return result;
 		}
@@ -132,7 +255,6 @@ namespace NmapLib
 		{
 			var doc = new XmlDocument();
 			doc.Load(file);
-			//this.Add("192.168.1.1", new NmapEntry("tcp", 80, "open", "http", "http", "Nginx/1.8", true));
 			foreach (XmlNode hostNode in doc.DocumentElement.SelectNodes("/nmaprun/host"))
 			{
 				var hosts = new List<string>();
@@ -154,7 +276,7 @@ namespace NmapLib
 					{
 						string hostname = this.GetAttributeString(nodeHostname, "name");
 						string type = this.GetAttributeString(nodeHostname, "type");
-						if (type == "A" || type == "AAAA")
+						if (type == "user")
 							hosts.Add(hostname);
 					}
 					// Obtain all services
@@ -163,7 +285,10 @@ namespace NmapLib
 					{
 						foreach (var host in hosts)
 						{
-							this.Add(host, services);
+							foreach (var service in services)
+							{
+								this.Add(new NmapEntry(host, service));
+							}
 						}
 					}
 				}
@@ -177,5 +302,131 @@ namespace NmapLib
 				this.ParseXml(file);
 			}
 		}
-    }
+	}
+ 
+
+	/// <summary>
+	/// Provides a generic collection that supports data binding and additionally supports sorting.
+	/// See http://msdn.microsoft.com/en-us/library/ms993236.aspx
+	/// If the elements are IComparable it uses that; otherwise compares the ToString()
+	/// </summary>
+	/// <typeparam name="T">The type of elements in the list.</typeparam>
+	public class SortableBindingList<T> : BindingList<T> where T : class
+	{
+		private bool _isSorted;
+		private ListSortDirection _sortDirection = ListSortDirection.Ascending;
+		private PropertyDescriptor _sortProperty;
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="SortableBindingList{T}"/> class.
+		/// </summary>
+		public SortableBindingList()
+		{
+		}
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="SortableBindingList{T}"/> class.
+		/// </summary>
+		/// <param name="list">An <see cref="T:System.Collections.Generic.IList`1" /> of items to be contained in the <see cref="T:System.ComponentModel.BindingList`1" />.</param>
+		public SortableBindingList(IList<T> list)
+			: base(list)
+		{
+		}
+
+		/// <summary>
+		/// Gets a value indicating whether the list supports sorting.
+		/// </summary>
+		protected override bool SupportsSortingCore
+		{
+			get { return true; }
+		}
+
+		/// <summary>
+		/// Gets a value indicating whether the list is sorted.
+		/// </summary>
+		protected override bool IsSortedCore
+		{
+			get { return _isSorted; }
+		}
+
+		/// <summary>
+		/// Gets the direction the list is sorted.
+		/// </summary>
+		protected override ListSortDirection SortDirectionCore
+		{
+			get { return _sortDirection; }
+		}
+
+		/// <summary>
+		/// Gets the property descriptor that is used for sorting the list if sorting is implemented in a derived class; otherwise, returns null
+		/// </summary>
+		protected override PropertyDescriptor SortPropertyCore
+		{
+			get { return _sortProperty; }
+		}
+
+		/// <summary>
+		/// Removes any sort applied with ApplySortCore if sorting is implemented
+		/// </summary>
+		protected override void RemoveSortCore()
+		{
+			_sortDirection = ListSortDirection.Ascending;
+			_sortProperty = null;
+			_isSorted = false; //thanks Luca
+		}
+
+		/// <summary>
+		/// Sorts the items if overridden in a derived class
+		/// </summary>
+		/// <param name="prop"></param>
+		/// <param name="direction"></param>
+		protected override void ApplySortCore(PropertyDescriptor prop, ListSortDirection direction)
+		{
+			_sortProperty = prop;
+			_sortDirection = direction;
+
+			List<T> list = Items as List<T>;
+			if (list == null) return;
+
+			list.Sort(Compare);
+
+			_isSorted = true;
+			//fire an event that the list has been changed.
+			OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
+		}
+
+
+		private int Compare(T lhs, T rhs)
+		{
+			var result = OnComparison(lhs, rhs);
+			//invert if descending
+			if (_sortDirection == ListSortDirection.Descending)
+				result = -result;
+			return result;
+		}
+
+		private int OnComparison(T lhs, T rhs)
+		{
+			object lhsValue = lhs == null ? null : _sortProperty.GetValue(lhs);
+			object rhsValue = rhs == null ? null : _sortProperty.GetValue(rhs);
+			if (lhsValue == null)
+			{
+				return (rhsValue == null) ? 0 : -1; //nulls are equal
+			}
+			if (rhsValue == null)
+			{
+				return 1; //first has value, second doesn't
+			}
+			if (lhsValue is IComparable)
+			{
+				return ((IComparable)lhsValue).CompareTo(rhsValue);
+			}
+			if (lhsValue.Equals(rhsValue))
+			{
+				return 0; //both are the same
+			}
+			//not comparable, compare ToString
+			return lhsValue.ToString().CompareTo(rhsValue.ToString());
+		}
+	}
 }

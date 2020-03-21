@@ -104,5 +104,17 @@ namespace SharpBurp.Properties {
                 this["ResourcePool"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("10")]
+        public decimal ChunkSize {
+            get {
+                return ((decimal)(this["ChunkSize"]));
+            }
+            set {
+                this["ChunkSize"] = value;
+            }
+        }
     }
 }
