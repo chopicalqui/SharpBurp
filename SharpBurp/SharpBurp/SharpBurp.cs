@@ -16,12 +16,21 @@ namespace SharpBurp
 	public partial class SharpBurp : Form
 	{
 		readonly Encoding _encoding = Encoding.Unicode;
+		NmapLoaderBackgroundWorker NmapLoaderBackgroundWorker = new NmapLoaderBackgroundWorker();
+		BackgroundWorker ExcelExportBackgroundWorker = new BackgroundWorker();
 
 		public SharpBurp()
 		{
 			InitializeComponent();
 			this.protocolDataGridViewTextBoxColumn.DataSource = Enum.GetValues(typeof(ServiceProtocol));
 			this.stateDataGridViewTextBoxColumn.DataSource = Enum.GetValues(typeof(ServiceState));
+			this.nmapResults.DataSource = new SortableBindingList<NmapEntry>();
+			this.cancelWorker.Visible = false;
+			this.ExcelExportBackgroundWorker.WorkerSupportsCancellation = true;
+			this.ExcelExportBackgroundWorker.WorkerReportsProgress = true;
+			this.ExcelExportBackgroundWorker.DoWork += new DoWorkEventHandler(this.DoExcelExport);
+			this.ExcelExportBackgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(this.ExcelExportCompleted);
+			this.ExcelExportBackgroundWorker.ProgressChanged += new ProgressChangedEventHandler(ExcelExportProgressChanged);
 		}
 
 		#region Helper Methods
@@ -61,6 +70,10 @@ namespace SharpBurp
 			}
 		}
 
+		/// <summary>
+		/// This method verifies the states of the Nmap service state checkboxes.
+		/// </summary>
+		/// <returns>Returns list of ServiceStates that are checked in the GUI.</returns>
 		private List<ServiceState> GetStates()
 		{
 			var result = new List<ServiceState>();
@@ -158,27 +171,28 @@ namespace SharpBurp
 			{
 				try
 				{
-					openFileDialog.Filter = "Nmap XML Result File (*.xml)|*.*";
-					openFileDialog.Title = "Open Nmap XML Scan Results";
-					openFileDialog.Multiselect = true;
-					openFileDialog.FilterIndex = 2;
-					openFileDialog.RestoreDirectory = true;
-
-					if (openFileDialog.ShowDialog() == DialogResult.OK)
+					if (!this.NmapLoaderBackgroundWorker.IsBusy)
 					{
-						this.statusMessage.Text = "Loading started";
-						var loader = new NmapLoader(openFileDialog.FileNames, states);
-						loader.LoadXml();
-						this.nmapResults.DataSource = loader;
-						MessageBox.Show(this
-							, "Nmap XML scan results import successfully completed."
-							, "Complete ..."
-							, MessageBoxButtons.OK
-							, MessageBoxIcon.Information);
-						this.statusMessage.Text = "Loading completed";
-						this.UpdateServiceCount();
+						openFileDialog.Filter = "Nmap XML Result File (*.xml)|*.*";
+						openFileDialog.Title = "Open Nmap XML Scan Results";
+						openFileDialog.Multiselect = true;
+						openFileDialog.FilterIndex = 2;
+						openFileDialog.RestoreDirectory = true;
+
+						if (openFileDialog.ShowDialog() == DialogResult.OK)
+						{
+							this.cancelWorker.Visible = true;
+							this.progressBar.Value = 0;
+							this.progressBar.Maximum = 100;
+							this.statusMessage.Text = "Nmap import started";
+							var loader = new NmapLoader(openFileDialog.FileNames, states);
+							this.NmapLoaderBackgroundWorker = new NmapLoaderBackgroundWorker(loader);
+							this.NmapLoaderBackgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(NmapLoaderCompleted);
+							this.NmapLoaderBackgroundWorker.ProgressChanged += new ProgressChangedEventHandler(NmapLoaderProgressChanged);
+							this.NmapLoaderBackgroundWorker.RunWorkerAsync();
+						}
 					}
-				}	
+				}
 				catch (Exception ex)
 				{
 					this.LogMessage(ex);
@@ -199,62 +213,15 @@ namespace SharpBurp
 				saveFileDialog.Filter = "Microsoft Excel File (*.xlsx)|*.*";
 				saveFileDialog.Title = "Save Microsoft Excel File";
 
-				if (saveFileDialog.ShowDialog() == DialogResult.OK && !string.IsNullOrEmpty(saveFileDialog.FileName))
+				if (!this.ExcelExportBackgroundWorker.IsBusy && 
+					saveFileDialog.ShowDialog() == DialogResult.OK && !string.IsNullOrEmpty(saveFileDialog.FileName))
 				{
-					try
-					{
-						this.statusMessage.Text = "Export started";
-						var excelApp = new Microsoft.Office.Interop.Excel.Application();
-						if (excelApp != null)
-						{
-							var excelWorkbook = excelApp.Workbooks.Add(1);
-							var excelWorksheet = (Microsoft.Office.Interop.Excel.Worksheet)excelApp.Worksheets[1];
-							uint column_index = 1;
-							// Add header information
-							foreach (DataGridViewColumn item in this.services.Columns)
-							{
-								excelWorksheet.Cells[1, column_index] = item.HeaderText;
-								column_index += 1;
-							}
-							// Add rows
-							int row_index = 2;
-							this.progressBar.Maximum = this.services.Rows.Count;
-							this.progressBar.Value = 0;
-							foreach (DataGridViewRow row in this.services.Rows)
-							{
-								if (row.IsNewRow) continue;
-								column_index = 1;
-								foreach (DataGridViewCell item in row.Cells)
-								{
-									excelWorksheet.Cells[row_index, column_index] = item.Value != null ? item.Value.ToString() : "";
-									column_index += 1;
-								}
-								row_index += 1;
-								this.progressBar.Value += 1;
-							}
-							excelWorkbook.SaveAs(saveFileDialog.FileName);
-							Marshal.ReleaseComObject(excelWorkbook);
-							Marshal.ReleaseComObject(excelApp);
-							MessageBox.Show(this
-								, "Microsoft Excel export successfully completed."
-								, "Complete ..."
-								, MessageBoxButtons.OK
-								, MessageBoxIcon.Information);
-							this.statusMessage.Text = "Export completed";
-						}
-					}
-					catch (Exception ex)
-					{
-						this.LogMessage(ex);
-					}
-				}
-				else
-				{
-					MessageBox.Show(this
-						, "Microsoft Excel is not properly installed."
-						, "Microsoft Excel not working ..."
-						, MessageBoxButtons.OK
-						, MessageBoxIcon.Error);
+					if (System.IO.File.Exists(saveFileDialog.FileName))
+						System.IO.File.Delete(saveFileDialog.FileName);
+					this.progressBar.Maximum = 100;
+					this.cancelWorker.Visible = true;
+					this.progressBar.Value = 0;
+					this.ExcelExportBackgroundWorker.RunWorkerAsync(saveFileDialog.FileName.ToString());
 				}
 			}
 		}
@@ -291,6 +258,18 @@ namespace SharpBurp
 				{
 					this.LogMessage(ex);
 				}
+			}
+		}
+
+		private void cancelWorker_Click(object sender, EventArgs e)
+		{
+			if (this.NmapLoaderBackgroundWorker.WorkerSupportsCancellation)
+			{
+				this.NmapLoaderBackgroundWorker.CancelAsync();
+			}
+			if (this.ExcelExportBackgroundWorker.WorkerSupportsCancellation)
+			{
+				this.ExcelExportBackgroundWorker.CancelAsync();
 			}
 		}
 		#endregion
@@ -439,7 +418,7 @@ namespace SharpBurp
 			this.UpdateServiceCount();
 		}
 
-		private void services_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+		private void services_RowValidating(object sender, DataGridViewCellCancelEventArgs e)
 		{
 			this.UpdateServiceCount();
 		}
@@ -454,8 +433,8 @@ namespace SharpBurp
 			bool outScan;
 			BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
 			if (results != null
-				&& e.ColumnIndex == 0 
-				&& (!bool.TryParse(e.FormattedValue.ToString(), out outScan) 
+				&& e.ColumnIndex == 0
+				&& (!bool.TryParse(e.FormattedValue.ToString(), out outScan)
 				|| outScan)
 				&& (!results[e.RowIndex].IsScanable()))
 			{
@@ -482,6 +461,135 @@ namespace SharpBurp
 			{
 				Process.Start(results[e.RowIndex].Url.ToString());
 			}
+		}
+		#endregion
+
+		#region NmapLoader BackgroundWorker
+		private void NmapLoaderCompleted(object sender, RunWorkerCompletedEventArgs e)
+		{
+			NmapLoaderBackgroundWorker backgroundWorker = sender as NmapLoaderBackgroundWorker;
+			SortableBindingList<NmapEntry> results = this.nmapResults.DataSource as SortableBindingList<NmapEntry>;
+
+			if (backgroundWorker != null && results != null)
+			{
+				if (e.Cancelled)
+				{
+					MessageBox.Show(this
+						, "Nmap XML scan results import canceled."
+						, "Import canceled ..."
+						, MessageBoxButtons.OK
+						, MessageBoxIcon.Information);
+					this.statusMessage.Text = "Nmap import completed";
+				}
+				else
+				{
+					this.cancelWorker.Visible = false;
+					// Add parsed items to DataGridView
+					this.progressBar.Maximum = backgroundWorker.NmapLoader.Count;
+					this.progressBar.Step = 1;
+					this.progressBar.Value = 0;
+					foreach (NmapEntry item in backgroundWorker.NmapLoader)
+					{
+						results.Add(item);
+						this.progressBar.PerformStep();
+					}
+					this.statusMessage.Text = "Nmap import completed";
+					this.UpdateServiceCount();
+					MessageBox.Show(this
+						, "Nmap XML scan results import successfully completed."
+						, "Import complete ..."
+						, MessageBoxButtons.OK
+						, MessageBoxIcon.Information);
+				}
+			}
+			this.progressBar.Value = 0;
+		}
+
+		private void NmapLoaderProgressChanged(object sender, ProgressChangedEventArgs e)
+		{
+			int percent = e.ProgressPercentage;
+			this.progressBar.Value = percent <= 100 ? percent : 100;
+		}
+		#endregion
+
+		#region Excel Export BackgroundWorker
+		public void DoExcelExport(object sender, DoWorkEventArgs e)
+		{
+			var excelApp = new Microsoft.Office.Interop.Excel.Application();
+			string fileName = e.Argument.ToString();
+			if (excelApp != null)
+			{
+				var excelWorkbook = excelApp.Workbooks.Add(1);
+				var excelWorksheet = (Microsoft.Office.Interop.Excel.Worksheet)excelApp.Worksheets[1];
+				uint column_index = 1;
+				// Add header information
+				foreach (DataGridViewColumn item in this.services.Columns)
+				{
+					excelWorksheet.Cells[1, column_index] = item.HeaderText;
+					column_index += 1;
+				}
+				// Add rows
+				int row_index = 2;
+				foreach (DataGridViewRow row in this.services.Rows)
+				{
+					if (this.ExcelExportBackgroundWorker.CancellationPending)
+					{
+						e.Cancel = true;
+						break;
+					}
+					if (row.IsNewRow) continue;
+					column_index = 1;
+					foreach (DataGridViewCell item in row.Cells)
+					{
+						excelWorksheet.Cells[row_index, column_index] = item.Value != null ? item.Value.ToString() : "";
+						column_index += 1;
+					}
+					row_index += 1;
+					this.ExcelExportBackgroundWorker.ReportProgress(Convert.ToInt32((row_index/(float)this.services.Rows.Count) * 100));
+				}
+				if (!e.Cancel)
+					excelWorkbook.SaveAs(fileName);
+				excelApp.DisplayAlerts = false;
+				excelApp.Workbooks.Close();
+				excelApp.Quit();
+				Marshal.ReleaseComObject(excelWorkbook);
+				Marshal.ReleaseComObject(excelApp);
+			}
+		}
+
+		private void ExcelExportCompleted(object sender, RunWorkerCompletedEventArgs e)
+		{
+			if (e.Cancelled)
+			{
+				MessageBox.Show(this
+					, "Microsoft Excel export canceled."
+					, "Canceled ..."
+					, MessageBoxButtons.OK
+					, MessageBoxIcon.Information);
+				this.statusMessage.Text = "Excel export canceled";
+			}
+			else if (e.Error != null)
+			{
+				this.LogMessage(e.Error);
+				this.statusMessage.Text = "Excel export failed";
+			}
+			else
+			{
+				MessageBox.Show(this
+					, "Microsoft Excel export successfully completed."
+					, "Complete ..."
+					, MessageBoxButtons.OK
+					, MessageBoxIcon.Information);
+				this.statusMessage.Text = "Excel export completed";
+			}
+			this.cancelWorker.Visible = false;
+			this.progressBar.Value = 0;
+		}
+
+		private void ExcelExportProgressChanged(object sender, ProgressChangedEventArgs e)
+		{
+			int percent = e.ProgressPercentage;
+			this.progressBar.Value = percent <= 100 ? percent : 100;
 		}
 		#endregion
 	}

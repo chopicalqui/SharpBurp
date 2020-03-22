@@ -163,20 +163,66 @@ namespace NmapLib
 		}
 	}
 
-    public class NmapLoader : SortableBindingList<NmapEntry>
+	/// <summary>
+	/// This class implements all BackgroundWorker functionalities for SharpBurp
+	/// </summary>
+	public class NmapLoaderBackgroundWorker : BackgroundWorker
+	{
+		public NmapLoader NmapLoader { get; }
+
+		public NmapLoaderBackgroundWorker()
+		{
+			this.WorkerSupportsCancellation = true;
+			this.WorkerReportsProgress = true;
+			this.NmapLoader = null;
+		}
+
+		public NmapLoaderBackgroundWorker(NmapLoader nmapLoader) : this()
+		{
+			this.NmapLoader = nmapLoader;
+			this.DoWork += new DoWorkEventHandler(this.NmapLoader.LoadXml);
+		}
+	}
+
+	public class NmapLoader : List<NmapEntry>
     {
 		protected string[] Files { get;  }
 		protected List<ServiceState> States { get;  }
 		protected Regex HttpResponseRegex { get; }
+		private NmapLoaderBackgroundWorker BackgroundWorker { get; set; }
+		private DoWorkEventArgs EventArguments { get; set; }
 
 		public NmapLoader(string[] files, List<ServiceState> states)
 		{
-			this.RaiseListChangedEvents = true;
+			this.BackgroundWorker = null;
+			this.EventArguments = null;
 			this.Files = files;
 			this.States = states;
 			this.HttpResponseRegex = new Regex(@"HTTP/\d+\.\d+ \d{3} [a-zA-Z]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 		}
 
+		#region Helper Methods
+		public int XmlHostCount
+		{
+			get
+			{
+				int result = 0;
+				foreach (var file in this.Files)
+				{
+					var doc = new XmlDocument();
+					doc.Load(file);
+					result += doc.DocumentElement.SelectNodes("/nmaprun/host").Count;
+				}
+				return result;
+			}
+		}
+
+		/// <summary>
+		/// This method shall be used to obtain the value of a specific XML tag attribute as string.
+		/// </summary>
+		/// <param name="node">The XML tag from which a specific attribute value shall be returned.</param>
+		/// <param name="name">The name of the attribute whose value shall be returned.</param>
+		/// <returns>The value of the attribute name or null if the attribute does not exist.</returns>
 		private string GetAttributeString(XmlNode node, string name)
 		{
 			string result = null;
@@ -187,6 +233,12 @@ namespace NmapLib
 			return result;
 		}
 
+		/// <summary>
+		/// This method shall be used to obtain the value of a specific XML tag attribute as int.
+		/// </summary>
+		/// <param name="node">The XML tag from which a specific attribute value shall be returned.</param>
+		/// <param name="name">The name of the attribute whose value shall be returned,</param>
+		/// <returns>The value of the attribute name or null if the attribute does not exist.</returns>
 		private int GetAttributeInt(XmlNode node, string name)
 		{
 			string result = this.GetAttributeString(node, name);
@@ -195,6 +247,24 @@ namespace NmapLib
 				result_int = Convert.ToInt32(result);
 			return result_int;
 		}
+
+		/// <summary>
+		/// Checks if the BackgroundWorker has been canceled.
+		/// </summary>
+		/// <returns>True if the BackgroundWorker has been canceled.</returns>
+		public bool IsBackgroundWorkerCanceled()
+		{
+			bool result = false;
+			if (this.EventArguments != null && this.EventArguments.Cancel)
+				result = true;
+			else if (this.BackgroundWorker != null && this.BackgroundWorker.CancellationPending)
+			{
+				this.EventArguments.Cancel = true;
+				result = true;
+			}
+			return result;
+		}
+		#endregion
 
 		private List<NmapEntry> ParseServices(XmlNode nodeHost)
 		{
@@ -251,13 +321,15 @@ namespace NmapLib
 			return result;
 		}
 
-		private void ParseXml(string file)
+		private void ParseXml(string file, ref int processedHostCount, int totalHostCount)
 		{
 			var doc = new XmlDocument();
 			doc.Load(file);
 			foreach (XmlNode hostNode in doc.DocumentElement.SelectNodes("/nmaprun/host"))
 			{
 				var hosts = new List<string>();
+				if (this.IsBackgroundWorkerCanceled())
+					break;
 				XmlNode nodeStatus = hostNode.SelectSingleNode("status");
 				string hostState = this.GetAttributeString(nodeStatus, "state");
 				if (hostState == "up")
@@ -292,141 +364,31 @@ namespace NmapLib
 						}
 					}
 				}
+				processedHostCount += 1;
+				if (this.BackgroundWorker != null && totalHostCount > 0)
+					this.BackgroundWorker.ReportProgress(Convert.ToInt32((processedHostCount/(float)totalHostCount) * 100));
 			}
+		}
+
+		public void LoadXml(object sender, DoWorkEventArgs e)
+		{
+			this.BackgroundWorker = sender as NmapLoaderBackgroundWorker;
+			this.EventArguments = e;
+			this.LoadXml();
 		}
 
 		public void LoadXml()
 		{
+			int processedHostCount = 0;
+			int totalHostCount = this.XmlHostCount;
 			foreach (var file in this.Files)
 			{
-				this.ParseXml(file);
+				if (this.IsBackgroundWorkerCanceled())
+					break;
+				this.ParseXml(file, ref processedHostCount, totalHostCount);
 			}
-		}
-	}
- 
-
-	/// <summary>
-	/// Provides a generic collection that supports data binding and additionally supports sorting.
-	/// See http://msdn.microsoft.com/en-us/library/ms993236.aspx
-	/// If the elements are IComparable it uses that; otherwise compares the ToString()
-	/// </summary>
-	/// <typeparam name="T">The type of elements in the list.</typeparam>
-	public class SortableBindingList<T> : BindingList<T> where T : class
-	{
-		private bool _isSorted;
-		private ListSortDirection _sortDirection = ListSortDirection.Ascending;
-		private PropertyDescriptor _sortProperty;
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="SortableBindingList{T}"/> class.
-		/// </summary>
-		public SortableBindingList()
-		{
-		}
-
-		/// <summary>
-		/// Initializes a new instance of the <see cref="SortableBindingList{T}"/> class.
-		/// </summary>
-		/// <param name="list">An <see cref="T:System.Collections.Generic.IList`1" /> of items to be contained in the <see cref="T:System.ComponentModel.BindingList`1" />.</param>
-		public SortableBindingList(IList<T> list)
-			: base(list)
-		{
-		}
-
-		/// <summary>
-		/// Gets a value indicating whether the list supports sorting.
-		/// </summary>
-		protected override bool SupportsSortingCore
-		{
-			get { return true; }
-		}
-
-		/// <summary>
-		/// Gets a value indicating whether the list is sorted.
-		/// </summary>
-		protected override bool IsSortedCore
-		{
-			get { return _isSorted; }
-		}
-
-		/// <summary>
-		/// Gets the direction the list is sorted.
-		/// </summary>
-		protected override ListSortDirection SortDirectionCore
-		{
-			get { return _sortDirection; }
-		}
-
-		/// <summary>
-		/// Gets the property descriptor that is used for sorting the list if sorting is implemented in a derived class; otherwise, returns null
-		/// </summary>
-		protected override PropertyDescriptor SortPropertyCore
-		{
-			get { return _sortProperty; }
-		}
-
-		/// <summary>
-		/// Removes any sort applied with ApplySortCore if sorting is implemented
-		/// </summary>
-		protected override void RemoveSortCore()
-		{
-			_sortDirection = ListSortDirection.Ascending;
-			_sortProperty = null;
-			_isSorted = false; //thanks Luca
-		}
-
-		/// <summary>
-		/// Sorts the items if overridden in a derived class
-		/// </summary>
-		/// <param name="prop"></param>
-		/// <param name="direction"></param>
-		protected override void ApplySortCore(PropertyDescriptor prop, ListSortDirection direction)
-		{
-			_sortProperty = prop;
-			_sortDirection = direction;
-
-			List<T> list = Items as List<T>;
-			if (list == null) return;
-
-			list.Sort(Compare);
-
-			_isSorted = true;
-			//fire an event that the list has been changed.
-			OnListChanged(new ListChangedEventArgs(ListChangedType.Reset, -1));
-		}
-
-
-		private int Compare(T lhs, T rhs)
-		{
-			var result = OnComparison(lhs, rhs);
-			//invert if descending
-			if (_sortDirection == ListSortDirection.Descending)
-				result = -result;
-			return result;
-		}
-
-		private int OnComparison(T lhs, T rhs)
-		{
-			object lhsValue = lhs == null ? null : _sortProperty.GetValue(lhs);
-			object rhsValue = rhs == null ? null : _sortProperty.GetValue(rhs);
-			if (lhsValue == null)
-			{
-				return (rhsValue == null) ? 0 : -1; //nulls are equal
-			}
-			if (rhsValue == null)
-			{
-				return 1; //first has value, second doesn't
-			}
-			if (lhsValue is IComparable)
-			{
-				return ((IComparable)lhsValue).CompareTo(rhsValue);
-			}
-			if (lhsValue.Equals(rhsValue))
-			{
-				return 0; //both are the same
-			}
-			//not comparable, compare ToString
-			return lhsValue.ToString().CompareTo(rhsValue.ToString());
+			if (this.IsBackgroundWorkerCanceled())
+				this.Clear();
 		}
 	}
 }

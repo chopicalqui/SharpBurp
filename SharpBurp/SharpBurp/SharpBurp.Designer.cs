@@ -29,6 +29,7 @@
 		private void InitializeComponent()
 		{
 			this.components = new System.ComponentModel.Container();
+			System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SharpBurp));
 			this.groupBox1 = new System.Windows.Forms.GroupBox();
 			this.chunkSize = new System.Windows.Forms.NumericUpDown();
 			this.label6 = new System.Windows.Forms.Label();
@@ -76,6 +77,7 @@
 			this.statusMessage = new System.Windows.Forms.ToolStripStatusLabel();
 			this.statusRowCount = new System.Windows.Forms.ToolStripStatusLabel();
 			this.progressBar = new System.Windows.Forms.ToolStripProgressBar();
+			this.cancelWorker = new System.Windows.Forms.ToolStripDropDownButton();
 			this.groupBox1.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.chunkSize)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
@@ -385,7 +387,7 @@
 			this.services.TabIndex = 0;
 			this.services.CellContentDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.services_CellContentDoubleClick);
 			this.services.CellValidating += new System.Windows.Forms.DataGridViewCellValidatingEventHandler(this.services_CellValidating);
-			this.services.CellValueChanged += new System.Windows.Forms.DataGridViewCellEventHandler(this.services_CellValueChanged);
+			this.services.RowValidating += new System.Windows.Forms.DataGridViewCellCancelEventHandler(this.services_RowValidating);
 			this.services.UserAddedRow += new System.Windows.Forms.DataGridViewRowEventHandler(this.services_UserAddedRow);
 			this.services.UserDeletedRow += new System.Windows.Forms.DataGridViewRowEventHandler(this.services_UserDeletedRow);
 			this.services.MouseClick += new System.Windows.Forms.MouseEventHandler(this.services_MouseClick);
@@ -550,7 +552,8 @@
 			this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.statusMessage,
             this.statusRowCount,
-            this.progressBar});
+            this.progressBar,
+            this.cancelWorker});
 			this.statusStrip1.Location = new System.Drawing.Point(0, 1144);
 			this.statusStrip1.Name = "statusStrip1";
 			this.statusStrip1.Size = new System.Drawing.Size(1594, 38);
@@ -573,6 +576,16 @@
 			// 
 			this.progressBar.Name = "progressBar";
 			this.progressBar.Size = new System.Drawing.Size(100, 32);
+			// 
+			// cancelWorker
+			// 
+			this.cancelWorker.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
+			this.cancelWorker.Image = ((System.Drawing.Image)(resources.GetObject("cancelWorker.Image")));
+			this.cancelWorker.ImageTransparentColor = System.Drawing.Color.Magenta;
+			this.cancelWorker.Name = "cancelWorker";
+			this.cancelWorker.Size = new System.Drawing.Size(54, 36);
+			this.cancelWorker.Text = "toolStripDropDownButton1";
+			this.cancelWorker.Click += new System.EventHandler(this.cancelWorker_Click);
 			// 
 			// SharpBurp
 			// 
@@ -655,6 +668,7 @@
 		private System.Windows.Forms.DataGridViewTextBoxColumn confidenceDataGridViewTextBoxColumn;
 		private System.Windows.Forms.DataGridViewTextBoxColumn osTypeDataGridViewTextBoxColumn;
 		private System.Windows.Forms.DataGridViewLinkColumn urlDataGridViewTextBoxColumn;
+		private System.Windows.Forms.ToolStripDropDownButton cancelWorker;
 	}
 }
 
