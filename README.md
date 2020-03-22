@@ -1,7 +1,9 @@
 # SharpBurp
 
-C# application, which parses a Nmap XML output file and allows sending 
-selected HTTP services to the BurpSuite scanner.
+C# application, which parses Nmap XML output files and allows sending 
+selected HTTP services to the BurpSuite Scanner via BurpSuite's REST API.
+Use this application to start large-scale web application security scans
+based on Nmap scan results.
 
 ## Configuration
 
@@ -19,16 +21,16 @@ store all configuration:
   1. Load one or more Nmap XML scan result files into SharpBurp by using 
   the button 'Load Nmap XML'. Per default, SharpBurp only imports open ports 
   (see checkbox 'Import Open').
-  2. Tell SharpBurp, which URLs shall be sent to the Burp Suite Scanner 
+  2. Tell SharpBurp, which URLs shall be sent to the BurpSuite Scanner 
   by checking or unchecking the respective checkboxes in column 'Scan'. In
-  addition, the table's context menu can be used to check or unchek multiple 
+  addition, the table's context menu can be used to check or uncheck multiple 
   rows. Thereby, only HTTP services can be scanned (rows that contain 'http' in 
   column 'Nmap Name New').
   2. Choose BurpSuite's scan configuration and resource pool that shall be 
   used for the scans. The 'Scan Size' field tells SharpBurp how many URLs shall
   be scanned by one single BurpSuite scan. In other words, the total number of
   BurpSuite scans is the total number of selected rows (see status bar) 
-  divided by the 'ScanSize'.
+  divided by the 'Scan Size'.
   5. Click button 'Send to Burp API' to send the selected URLs to the BurpSuite 
   Scanner.
   

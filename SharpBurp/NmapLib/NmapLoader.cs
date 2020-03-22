@@ -23,17 +23,17 @@ namespace NmapLib
 
 	public class NmapEntry
 	{
-		public bool scan { get; set; }
+		private bool scan;
 		public string Host { get; set; }
-		public ServiceProtocol protocol { get; set; }
-		private ServiceState state { get; set; }
+		private ServiceProtocol protocol;
+		private ServiceState state;
 		public int Port { get; set; }
 		public bool Tls { get; set; }
 		private string nmapNameNew { get; set; }
-		public string NmapNameOriginal { get; set; }
-		public string Version { get; set; }
-		public int Confidence { get; set; }
-		public string OsType { get; set; }
+		public string NmapNameOriginal { get; }
+		public string Version { get; }
+		public int Confidence { get; }
+		public string OsType { get; }
 
 		public NmapEntry()
 		{

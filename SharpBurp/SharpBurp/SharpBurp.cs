@@ -24,12 +24,21 @@ namespace SharpBurp
 			this.stateDataGridViewTextBoxColumn.DataSource = Enum.GetValues(typeof(ServiceState));
 		}
 
+		#region Helper Methods
+		/// <summary>
+		/// This method shall be used to report exceptions in SharpBurp's log textarea.
+		/// </summary>
+		/// <param name="ex">The exception that shall be reported</param>
 		public void LogMessage(Exception ex)
 		{
 			this.statusMessage.Text = "Task failed";
 			this.LogMessage(ex.ToString());
 		}
 
+		/// <summary>
+		/// This message shall be used to report messages in SharpBurp's log textarea.
+		/// </summary>
+		/// <param name="message">The message that shall be reported</param>
 		public void LogMessage(string message)
 		{
 			string logMessage = String.Format("{0}: {1}\n"
@@ -38,6 +47,10 @@ namespace SharpBurp
 			this.logMessages.AppendText(logMessage);
 		}
 
+		/// <summary>
+		/// This method updates the number of selected rows and number of total rows in SharpBurp's
+		/// statusbar.
+		/// </summary>
 		public void UpdateServiceCount()
 		{
 			BindingList<NmapEntry> list = this.nmapResults.DataSource as BindingList<NmapEntry>;
@@ -64,6 +77,80 @@ namespace SharpBurp
 			return result;
 		}
 
+		/// <summary>
+		/// This method decrypts the given string using Microsoft Windows' Data Protection API (DPAPI).
+		/// </summary>
+		/// <param name="encryptedString">The string that shall be decrypted.</param>
+		/// <returns>The decrypted string</returns>
+		private string Unprotect(string encryptedString)
+		{
+			byte[] protectedData = Convert.FromBase64String(encryptedString);
+			byte[] unprotectedData = ProtectedData.Unprotect(protectedData, null, DataProtectionScope.CurrentUser);
+
+			return _encoding.GetString(unprotectedData);
+		}
+
+		/// <summary>
+		/// This method encrypts the given string using Microsoft Windows' Data Protection API (DPAPI).
+		/// </summary>
+		/// <param name="unprotectedString">The string that shall be encrypted.</param>
+		/// <returns>The encrypted string</returns>
+		private string Protect(string unprotectedString)
+		{
+			byte[] unprotectedData = _encoding.GetBytes(unprotectedString);
+			byte[] protectedData = ProtectedData.Protect(unprotectedData, null, DataProtectionScope.CurrentUser);
+
+			return Convert.ToBase64String(protectedData);
+		}
+
+		/// <summary>
+		/// Verifies whether all mandatory user inputs are available for sending data to the BurpSuite REST API
+		/// </summary>
+		/// <returns>True, if all mandatory data is available</returns>
+		private bool InputsComplete()
+		{
+			bool result = true;
+			if (string.IsNullOrEmpty(this.burpUrl.Text))
+			{
+				MessageBox.Show(this
+					, "Input 'Burp Service URL' is mandatory."
+					, "Incomplete input ..."
+					, MessageBoxButtons.OK
+					, MessageBoxIcon.Exclamation);
+				result = false;
+			}
+			else if (string.IsNullOrEmpty(this.apiVersion.Text))
+			{
+				MessageBox.Show(this
+					, "Input 'API Version' is mandatory."
+					, "Incomplete input ..."
+					, MessageBoxButtons.OK
+					, MessageBoxIcon.Exclamation);
+				result = false;
+			}
+			else if (string.IsNullOrEmpty(this.scanConfiguration.Text))
+			{
+				MessageBox.Show(this
+					, "Input 'Scan Configuration' is mandatory."
+					, "Incomplete input ..."
+					, MessageBoxButtons.OK
+					, MessageBoxIcon.Exclamation);
+				result = false;
+			}
+			else if (string.IsNullOrEmpty(this.resourcePool.Text))
+			{
+				MessageBox.Show(this
+					, "Input 'Resource Pool' is mandatory."
+					, "Incomplete input ..."
+					, MessageBoxButtons.OK
+					, MessageBoxIcon.Exclamation);
+				result = false;
+			}
+			return result;
+		}
+		#endregion
+
+		#region Button Events
 		private void loadNmap_Click(object sender, EventArgs e)
 		{
 			var states = this.GetStates();
@@ -97,22 +184,6 @@ namespace SharpBurp
 					this.LogMessage(ex);
 				}
 			}
-		}
-
-		private string Unprotect(string encryptedString)
-		{
-			byte[] protectedData = Convert.FromBase64String(encryptedString);
-			byte[] unprotectedData = ProtectedData.Unprotect(protectedData, null, DataProtectionScope.CurrentUser);
-
-			return _encoding.GetString(unprotectedData);
-		}
-
-		private string Protect(string unprotectedString)
-		{
-			byte[] unprotectedData = _encoding.GetBytes(unprotectedString);
-			byte[] protectedData = ProtectedData.Protect(unprotectedData, null, DataProtectionScope.CurrentUser);
-
-			return Convert.ToBase64String(protectedData);
 		}
 
 		private void clearTable_Click(object sender, EventArgs e)
@@ -188,6 +259,43 @@ namespace SharpBurp
 			}
 		}
 
+		private void sendBurp_Click(object sender, EventArgs e)
+		{
+			if (this.InputsComplete())
+			{
+				try
+				{
+					var api = new BurpSuiteApi(this.burpUrl.Text
+						, this.apiVersion.Text
+						, apiKey.Text
+						, this.scanConfiguration.Text
+						, this.resourcePool.Text
+						, (int)this.chunkSize.Value);
+					BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
+					this.statusMessage.Text = "Task started";
+					List<Uri> urls = new List<Uri>();
+					foreach (NmapEntry entry in results)
+					{
+						if (entry.Scan)
+							urls.Add(entry.Url);
+					}
+					api.Scan(urls);
+					MessageBox.Show(this
+						, "URLs successfully sent to BurpSuite."
+						, "Complete ..."
+						, MessageBoxButtons.OK
+						, MessageBoxIcon.Information);
+					this.statusMessage.Text = "Task completed";
+				}
+				catch (Exception ex)
+				{
+					this.LogMessage(ex);
+				}
+			}
+		}
+		#endregion
+
+		#region Form Loading and Closing Events
 		private void SharpBurp_Load(object sender, EventArgs e)
 		{
 			try
@@ -240,84 +348,9 @@ namespace SharpBurp
 					, MessageBoxIcon.Error);
 			}
 		}
+		#endregion
 
-		private bool InputsComplete()
-		{
-			bool result = true;
-			if (string.IsNullOrEmpty(this.burpUrl.Text))
-			{
-				MessageBox.Show(this
-					, "Input 'Burp Service URL' is mandatory."
-					, "Incomplete input ..."
-					, MessageBoxButtons.OK
-					, MessageBoxIcon.Exclamation);
-				result = false;
-			}
-			else if (string.IsNullOrEmpty(this.apiVersion.Text))
-			{
-				MessageBox.Show(this
-					, "Input 'API Version' is mandatory."
-					, "Incomplete input ..."
-					, MessageBoxButtons.OK
-					, MessageBoxIcon.Exclamation);
-				result = false;
-			}
-			else if (string.IsNullOrEmpty(this.scanConfiguration.Text))
-			{
-				MessageBox.Show(this
-					, "Input 'Scan Configuration' is mandatory."
-					, "Incomplete input ..."
-					, MessageBoxButtons.OK
-					, MessageBoxIcon.Exclamation);
-				result = false;
-			}
-			else if (string.IsNullOrEmpty(this.resourcePool.Text))
-			{
-				MessageBox.Show(this
-					, "Input 'Resource Pool' is mandatory."
-					, "Incomplete input ..."
-					, MessageBoxButtons.OK
-					, MessageBoxIcon.Exclamation);
-				result = false;
-			}
-			return result;
-		}
-
-		private void sendBurp_Click(object sender, EventArgs e)
-		{
-			if (this.InputsComplete())
-			{
-				try
-				{
-					var api = new BurpSuiteApi(this.burpUrl.Text
-						, this.apiVersion.Text
-						, apiKey.Text
-						, this.scanConfiguration.Text
-						, this.resourcePool.Text
-						, (int)this.chunkSize.Value);
-					BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
-					this.statusMessage.Text = "Task started";
-					List<Uri> urls = new List<Uri>();
-					foreach (NmapEntry entry in results)
-					{
-						if (entry.Scan)
-							urls.Add(entry.Url);
-					}
-					api.Scan(urls);
-					MessageBox.Show(this
-						, "URLs successfully sent to BurpSuite."
-						, "Complete ..."
-						, MessageBoxButtons.OK
-						, MessageBoxIcon.Information);
-					this.statusMessage.Text = "Task completed";
-				}
-				catch (Exception ex)
-				{
-					this.LogMessage(ex);
-				}
-			}
-		}
-
+		#region DataGridView Events
 		private void UpdateRows(bool scan)
 		{
 			try
@@ -450,5 +483,6 @@ namespace SharpBurp
 				Process.Start(results[e.RowIndex].Url.ToString());
 			}
 		}
+		#endregion
 	}
 }
