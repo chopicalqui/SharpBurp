@@ -361,7 +361,7 @@ namespace SharpBurp
 				BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
 				foreach (NmapEntry row in results)
 				{
-					if (row.Scan != scan)
+					if (row.Scan != scan && row.IsScanable())
 						row.Scan = scan;
 					this.progressBar.Value += 1;
 				}
@@ -387,7 +387,7 @@ namespace SharpBurp
 				{
 					if (row.IsNewRow) continue;
 					NmapEntry entry = row.DataBoundItem as NmapEntry;
-					if (entry.Scan != scan)
+					if (entry.Scan != scan && entry.IsScanable())
 						entry.Scan = scan;
 					this.progressBar.Value += 1;
 				}
