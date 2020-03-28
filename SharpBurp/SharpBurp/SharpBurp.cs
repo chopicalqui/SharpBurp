@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
-using NmapLib;
+using ScanLib;
 using SharpBurp.Properties;
 using System.Security.Cryptography;
 using BurpSuiteLib;
@@ -16,7 +16,7 @@ namespace SharpBurp
 	public partial class SharpBurp : Form
 	{
 		readonly Encoding _encoding = Encoding.Unicode;
-		NmapLoaderBackgroundWorker NmapLoaderBackgroundWorker = new NmapLoaderBackgroundWorker();
+		ScanLoaderBackgroundWorker NmapLoaderBackgroundWorker = new ScanLoaderBackgroundWorker();
 		BackgroundWorker ExcelExportBackgroundWorker = new BackgroundWorker();
 
 		public SharpBurp()
@@ -24,7 +24,7 @@ namespace SharpBurp
 			InitializeComponent();
 			this.protocolDataGridViewTextBoxColumn.DataSource = Enum.GetValues(typeof(ServiceProtocol));
 			this.stateDataGridViewTextBoxColumn.DataSource = Enum.GetValues(typeof(ServiceState));
-			this.nmapResults.DataSource = new SortableBindingList<NmapEntry>();
+			this.nmapResults.DataSource = new SortableBindingList<ScanLib.ScanEntry>();
 			this.cancelWorker.Visible = false;
 			this.ExcelExportBackgroundWorker.WorkerSupportsCancellation = true;
 			this.ExcelExportBackgroundWorker.WorkerReportsProgress = true;
@@ -62,7 +62,7 @@ namespace SharpBurp
 		/// </summary>
 		public void UpdateServiceCount()
 		{
-			BindingList<NmapEntry> list = this.nmapResults.DataSource as BindingList<NmapEntry>;
+			BindingList<ScanLib.ScanEntry> list = this.nmapResults.DataSource as BindingList<ScanLib.ScanEntry>;
 			if (list != null)
 			{
 				int count = (from item in list where item.Scan select item).Count();
@@ -164,6 +164,42 @@ namespace SharpBurp
 		#endregion
 
 		#region Button Events
+		private void loadNessus_Click(object sender, EventArgs e)
+		{
+			var states = this.GetStates();
+			using (var openFileDialog = new OpenFileDialog())
+			{
+				try
+				{
+					if (!this.NmapLoaderBackgroundWorker.IsBusy)
+					{
+						openFileDialog.Filter = "Nessus Result File (*.nessus)|*.*";
+						openFileDialog.Title = "Open Nessus Scan Results";
+						openFileDialog.Multiselect = true;
+						openFileDialog.FilterIndex = 2;
+						openFileDialog.RestoreDirectory = true;
+
+						if (openFileDialog.ShowDialog() == DialogResult.OK)
+						{
+							this.cancelWorker.Visible = true;
+							this.progressBar.Value = 0;
+							this.progressBar.Maximum = 100;
+							this.statusMessage.Text = "Import started";
+							var loader = new NessusLoader(openFileDialog.FileNames, states);
+							this.NmapLoaderBackgroundWorker = new ScanLoaderBackgroundWorker(loader);
+							this.NmapLoaderBackgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(ScanLoaderCompleted);
+							this.NmapLoaderBackgroundWorker.ProgressChanged += new ProgressChangedEventHandler(ScanLoaderProgressChanged);
+							this.NmapLoaderBackgroundWorker.RunWorkerAsync();
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					this.LogMessage(ex);
+				}
+			}
+		}
+
 		private void loadNmap_Click(object sender, EventArgs e)
 		{
 			var states = this.GetStates();
@@ -184,11 +220,11 @@ namespace SharpBurp
 							this.cancelWorker.Visible = true;
 							this.progressBar.Value = 0;
 							this.progressBar.Maximum = 100;
-							this.statusMessage.Text = "Nmap import started";
+							this.statusMessage.Text = "Import started";
 							var loader = new NmapLoader(openFileDialog.FileNames, states);
-							this.NmapLoaderBackgroundWorker = new NmapLoaderBackgroundWorker(loader);
-							this.NmapLoaderBackgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(NmapLoaderCompleted);
-							this.NmapLoaderBackgroundWorker.ProgressChanged += new ProgressChangedEventHandler(NmapLoaderProgressChanged);
+							this.NmapLoaderBackgroundWorker = new ScanLoaderBackgroundWorker(loader);
+							this.NmapLoaderBackgroundWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(ScanLoaderCompleted);
+							this.NmapLoaderBackgroundWorker.ProgressChanged += new ProgressChangedEventHandler(ScanLoaderProgressChanged);
 							this.NmapLoaderBackgroundWorker.RunWorkerAsync();
 						}
 					}
@@ -238,10 +274,10 @@ namespace SharpBurp
 						, this.scanConfiguration.Text
 						, this.resourcePool.Text
 						, (int)this.chunkSize.Value);
-					BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
+					BindingList<ScanLib.ScanEntry> results = this.nmapResults.DataSource as BindingList<ScanLib.ScanEntry>;
 					this.statusMessage.Text = "Task started";
 					List<Uri> urls = new List<Uri>();
-					foreach (NmapEntry entry in results)
+					foreach (ScanLib.ScanEntry entry in results)
 					{
 						if (entry.Scan)
 							urls.Add(entry.Url);
@@ -337,10 +373,10 @@ namespace SharpBurp
 				this.statusMessage.Text = "Update rows";
 				this.progressBar.Maximum = this.nmapResults.Count;
 				this.progressBar.Value = 0;
-				BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
-				foreach (NmapEntry row in results)
+				BindingList<ScanLib.ScanEntry> results = this.nmapResults.DataSource as BindingList<ScanLib.ScanEntry>;
+				foreach (ScanLib.ScanEntry row in results)
 				{
-					if (row.Scan != scan)
+					if (row.Scan != scan && row.IsScanable())
 						row.Scan = scan;
 					this.progressBar.Value += 1;
 				}
@@ -358,15 +394,15 @@ namespace SharpBurp
 		{
 			try
 			{
-				BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
+				BindingList<ScanLib.ScanEntry> results = this.nmapResults.DataSource as BindingList<ScanLib.ScanEntry>;
 				this.statusMessage.Text = "Update rows";
 				this.progressBar.Maximum = rows.Count;
 				this.progressBar.Value = 0;
 				foreach (DataGridViewRow row in rows)
 				{
 					if (row.IsNewRow) continue;
-					NmapEntry entry = row.DataBoundItem as NmapEntry;
-					if (entry.Scan != scan)
+					ScanLib.ScanEntry entry = row.DataBoundItem as ScanLib.ScanEntry;
+					if (entry.Scan != scan && entry.IsScanable())
 						entry.Scan = scan;
 					this.progressBar.Value += 1;
 				}
@@ -431,7 +467,7 @@ namespace SharpBurp
 		private void services_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
 		{
 			bool outScan;
-			BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
+			BindingList<ScanLib.ScanEntry> results = this.nmapResults.DataSource as BindingList<ScanLib.ScanEntry>;
 			if (results != null
 				&& e.ColumnIndex == 0
 				&& (!bool.TryParse(e.FormattedValue.ToString(), out outScan)
@@ -455,7 +491,7 @@ namespace SharpBurp
 		/// <param name="e"></param>
 		private void services_CellContentDoubleClick(object sender, DataGridViewCellEventArgs e)
 		{
-			BindingList<NmapEntry> results = this.nmapResults.DataSource as BindingList<NmapEntry>;
+			BindingList<ScanLib.ScanEntry> results = this.nmapResults.DataSource as BindingList<ScanLib.ScanEntry>;
 			if (results != null
 				&& e.ColumnIndex == (this.services.Columns.Count - 1))
 			{
@@ -464,39 +500,39 @@ namespace SharpBurp
 		}
 		#endregion
 
-		#region NmapLoader BackgroundWorker
-		private void NmapLoaderCompleted(object sender, RunWorkerCompletedEventArgs e)
+		#region ScanLoader BackgroundWorker
+		private void ScanLoaderCompleted(object sender, RunWorkerCompletedEventArgs e)
 		{
-			NmapLoaderBackgroundWorker backgroundWorker = sender as NmapLoaderBackgroundWorker;
-			SortableBindingList<NmapEntry> results = this.nmapResults.DataSource as SortableBindingList<NmapEntry>;
+			ScanLoaderBackgroundWorker backgroundWorker = sender as ScanLoaderBackgroundWorker;
+			SortableBindingList<ScanLib.ScanEntry> results = this.nmapResults.DataSource as SortableBindingList<ScanLib.ScanEntry>;
 
 			if (backgroundWorker != null && results != null)
 			{
 				if (e.Cancelled)
 				{
 					MessageBox.Show(this
-						, "Nmap XML scan results import canceled."
+						, "Scan import canceled."
 						, "Import canceled ..."
 						, MessageBoxButtons.OK
 						, MessageBoxIcon.Information);
-					this.statusMessage.Text = "Nmap import completed";
+					this.statusMessage.Text = "Import completed";
 				}
 				else
 				{
 					this.cancelWorker.Visible = false;
 					// Add parsed items to DataGridView
-					this.progressBar.Maximum = backgroundWorker.NmapLoader.Count;
+					this.progressBar.Maximum = backgroundWorker.ScanLoader.Count;
 					this.progressBar.Step = 1;
 					this.progressBar.Value = 0;
-					foreach (NmapEntry item in backgroundWorker.NmapLoader)
+					foreach (ScanLib.ScanEntry item in backgroundWorker.ScanLoader)
 					{
 						results.Add(item);
 						this.progressBar.PerformStep();
 					}
-					this.statusMessage.Text = "Nmap import completed";
+					this.statusMessage.Text = "Import completed";
 					this.UpdateServiceCount();
 					MessageBox.Show(this
-						, "Nmap XML scan results import successfully completed."
+						, "Scan results import successfully completed."
 						, "Import complete ..."
 						, MessageBoxButtons.OK
 						, MessageBoxIcon.Information);
@@ -505,7 +541,7 @@ namespace SharpBurp
 			this.progressBar.Value = 0;
 		}
 
-		private void NmapLoaderProgressChanged(object sender, ProgressChangedEventArgs e)
+		private void ScanLoaderProgressChanged(object sender, ProgressChangedEventArgs e)
 		{
 			int percent = e.ProgressPercentage;
 			this.progressBar.Value = percent <= 100 ? percent : 100;

@@ -31,6 +31,7 @@
 			this.components = new System.ComponentModel.Container();
 			System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SharpBurp));
 			this.groupBox1 = new System.Windows.Forms.GroupBox();
+			this.loadNessus = new System.Windows.Forms.Button();
 			this.chunkSize = new System.Windows.Forms.NumericUpDown();
 			this.label6 = new System.Windows.Forms.Label();
 			this.ImportFiltered = new System.Windows.Forms.CheckBox();
@@ -66,6 +67,7 @@
 			this.confidenceDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
 			this.osTypeDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
 			this.urlDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewLinkColumn();
+			this.Source = new System.Windows.Forms.DataGridViewTextBoxColumn();
 			this.nmapResults = new System.Windows.Forms.BindingSource(this.components);
 			this.logMessages = new System.Windows.Forms.TextBox();
 			this.contextMenuTable = new System.Windows.Forms.ContextMenuStrip(this.components);
@@ -94,6 +96,7 @@
 			// 
 			this.groupBox1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+			this.groupBox1.Controls.Add(this.loadNessus);
 			this.groupBox1.Controls.Add(this.chunkSize);
 			this.groupBox1.Controls.Add(this.label6);
 			this.groupBox1.Controls.Add(this.ImportFiltered);
@@ -121,6 +124,16 @@
 			this.groupBox1.TabIndex = 0;
 			this.groupBox1.TabStop = false;
 			this.groupBox1.Text = "Configuration";
+			// 
+			// loadNessus
+			// 
+			this.loadNessus.Location = new System.Drawing.Point(449, 285);
+			this.loadNessus.Name = "loadNessus";
+			this.loadNessus.Size = new System.Drawing.Size(224, 50);
+			this.loadNessus.TabIndex = 13;
+			this.loadNessus.Text = "Load &Nessus";
+			this.loadNessus.UseVisualStyleBackColor = true;
+			this.loadNessus.Click += new System.EventHandler(this.loadNessus_Click);
 			// 
 			// chunkSize
 			// 
@@ -243,30 +256,30 @@
 			// 
 			// exportCsv
 			// 
-			this.exportCsv.Location = new System.Drawing.Point(1046, 285);
+			this.exportCsv.Location = new System.Drawing.Point(1177, 285);
 			this.exportCsv.Name = "exportCsv";
-			this.exportCsv.Size = new System.Drawing.Size(260, 50);
-			this.exportCsv.TabIndex = 15;
+			this.exportCsv.Size = new System.Drawing.Size(224, 50);
+			this.exportCsv.TabIndex = 16;
 			this.exportCsv.Text = "&Export to Excel";
 			this.exportCsv.UseVisualStyleBackColor = true;
 			this.exportCsv.Click += new System.EventHandler(this.exportCsv_Click);
 			// 
 			// clearTable
 			// 
-			this.clearTable.Location = new System.Drawing.Point(487, 285);
+			this.clearTable.Location = new System.Drawing.Point(693, 285);
 			this.clearTable.Name = "clearTable";
-			this.clearTable.Size = new System.Drawing.Size(260, 50);
-			this.clearTable.TabIndex = 13;
+			this.clearTable.Size = new System.Drawing.Size(224, 50);
+			this.clearTable.TabIndex = 14;
 			this.clearTable.Text = "&Clear Table";
 			this.clearTable.UseVisualStyleBackColor = true;
 			this.clearTable.Click += new System.EventHandler(this.clearTable_Click);
 			// 
 			// sendBurp
 			// 
-			this.sendBurp.Location = new System.Drawing.Point(768, 285);
+			this.sendBurp.Location = new System.Drawing.Point(935, 285);
 			this.sendBurp.Name = "sendBurp";
-			this.sendBurp.Size = new System.Drawing.Size(260, 50);
-			this.sendBurp.TabIndex = 14;
+			this.sendBurp.Size = new System.Drawing.Size(224, 50);
+			this.sendBurp.TabIndex = 15;
 			this.sendBurp.Text = "&Send To Burp API";
 			this.sendBurp.UseVisualStyleBackColor = true;
 			this.sendBurp.Click += new System.EventHandler(this.sendBurp_Click);
@@ -275,7 +288,7 @@
 			// 
 			this.loadNmap.Location = new System.Drawing.Point(207, 285);
 			this.loadNmap.Name = "loadNmap";
-			this.loadNmap.Size = new System.Drawing.Size(260, 50);
+			this.loadNmap.Size = new System.Drawing.Size(224, 50);
 			this.loadNmap.TabIndex = 12;
 			this.loadNmap.Text = "&Load Nmap XML";
 			this.loadNmap.UseVisualStyleBackColor = true;
@@ -378,7 +391,8 @@
             this.versionDataGridViewTextBoxColumn,
             this.confidenceDataGridViewTextBoxColumn,
             this.osTypeDataGridViewTextBoxColumn,
-            this.urlDataGridViewTextBoxColumn});
+            this.urlDataGridViewTextBoxColumn,
+            this.Source});
 			this.services.DataSource = this.nmapResults;
 			this.services.Location = new System.Drawing.Point(3, -7);
 			this.services.Name = "services";
@@ -443,17 +457,17 @@
 			// nmapNameNewDataGridViewTextBoxColumn
 			// 
 			this.nmapNameNewDataGridViewTextBoxColumn.DataPropertyName = "NmapNameNew";
-			this.nmapNameNewDataGridViewTextBoxColumn.HeaderText = "Nmap Name New";
+			this.nmapNameNewDataGridViewTextBoxColumn.HeaderText = "Service Name New";
 			this.nmapNameNewDataGridViewTextBoxColumn.Name = "nmapNameNewDataGridViewTextBoxColumn";
-			this.nmapNameNewDataGridViewTextBoxColumn.Width = 167;
+			this.nmapNameNewDataGridViewTextBoxColumn.Width = 181;
 			// 
 			// nmapNameOriginalDataGridViewTextBoxColumn
 			// 
 			this.nmapNameOriginalDataGridViewTextBoxColumn.DataPropertyName = "NmapNameOriginal";
-			this.nmapNameOriginalDataGridViewTextBoxColumn.HeaderText = "Nmap Name Original";
+			this.nmapNameOriginalDataGridViewTextBoxColumn.HeaderText = "Service Name Original";
 			this.nmapNameOriginalDataGridViewTextBoxColumn.Name = "nmapNameOriginalDataGridViewTextBoxColumn";
 			this.nmapNameOriginalDataGridViewTextBoxColumn.ReadOnly = true;
-			this.nmapNameOriginalDataGridViewTextBoxColumn.Width = 233;
+			this.nmapNameOriginalDataGridViewTextBoxColumn.Width = 248;
 			// 
 			// versionDataGridViewTextBoxColumn
 			// 
@@ -490,10 +504,18 @@
 			this.urlDataGridViewTextBoxColumn.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Automatic;
 			this.urlDataGridViewTextBoxColumn.Width = 99;
 			// 
+			// Source
+			// 
+			this.Source.DataPropertyName = "Source";
+			this.Source.HeaderText = "Source";
+			this.Source.Name = "Source";
+			this.Source.ReadOnly = true;
+			this.Source.Width = 125;
+			// 
 			// nmapResults
 			// 
 			this.nmapResults.AllowNew = true;
-			this.nmapResults.DataSource = typeof(NmapLib.NmapEntry);
+			this.nmapResults.DataSource = typeof(ScanLib.ScanEntry);
 			// 
 			// logMessages
 			// 
@@ -504,6 +526,7 @@
 			this.logMessages.Multiline = true;
 			this.logMessages.Name = "logMessages";
 			this.logMessages.ReadOnly = true;
+			this.logMessages.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
 			this.logMessages.Size = new System.Drawing.Size(1570, 129);
 			this.logMessages.TabIndex = 0;
 			// 
@@ -656,6 +679,8 @@
 		private System.Windows.Forms.ToolStripStatusLabel statusRowCount;
 		private System.Windows.Forms.ToolStripProgressBar progressBar;
 		private System.Windows.Forms.BindingSource nmapResults;
+		private System.Windows.Forms.ToolStripDropDownButton cancelWorker;
+		private System.Windows.Forms.Button loadNessus;
 		private System.Windows.Forms.DataGridViewCheckBoxColumn scanDataGridViewCheckBoxColumn;
 		private System.Windows.Forms.DataGridViewTextBoxColumn hostDataGridViewTextBoxColumn;
 		private System.Windows.Forms.DataGridViewComboBoxColumn protocolDataGridViewTextBoxColumn;
@@ -668,7 +693,7 @@
 		private System.Windows.Forms.DataGridViewTextBoxColumn confidenceDataGridViewTextBoxColumn;
 		private System.Windows.Forms.DataGridViewTextBoxColumn osTypeDataGridViewTextBoxColumn;
 		private System.Windows.Forms.DataGridViewLinkColumn urlDataGridViewTextBoxColumn;
-		private System.Windows.Forms.ToolStripDropDownButton cancelWorker;
+		private System.Windows.Forms.DataGridViewTextBoxColumn Source;
 	}
 }
 

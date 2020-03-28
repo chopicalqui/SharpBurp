@@ -87,9 +87,9 @@
       <Project>{14b7f046-c579-4ffe-a46c-2c58a1ffd595}</Project>
       <Name>BurpSuiteLib</Name>
     </ProjectReference>
-    <ProjectReference Include="..\NmapLib\NmapLib.csproj">
+    <ProjectReference Include="..\NmapLib\ScanLib.csproj">
       <Project>{dad48919-39e8-4e97-a529-5f4889237b66}</Project>
-      <Name>NmapLib</Name>
+      <Name>ScanLib</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
