@@ -50,9 +50,10 @@ namespace SharpBurp
 		/// <param name="message">The message that shall be reported</param>
 		public void LogMessage(string message)
 		{
-			string logMessage = String.Format("{0}: {1}\n"
+			string logMessage = String.Format("{0}: {1}{2}"
 				, DateTime.Now.ToString("MM/dd/yyyy hh:mm")
-				, message);
+				, message
+				, Environment.NewLine);
 			this.logMessages.AppendText(logMessage);
 		}
 
@@ -181,6 +182,7 @@ namespace SharpBurp
 
 						if (openFileDialog.ShowDialog() == DialogResult.OK)
 						{
+							this.services.Enabled = false;
 							this.cancelWorker.Visible = true;
 							this.progressBar.Value = 0;
 							this.progressBar.Maximum = 100;
@@ -217,6 +219,7 @@ namespace SharpBurp
 
 						if (openFileDialog.ShowDialog() == DialogResult.OK)
 						{
+							this.services.Enabled = false;
 							this.cancelWorker.Visible = true;
 							this.progressBar.Value = 0;
 							this.progressBar.Maximum = 100;
@@ -476,7 +479,7 @@ namespace SharpBurp
 			{
 				e.Cancel = true;
 				MessageBox.Show(this, "Row is not an active web application and therefore cannot be scanned. " +
-					"Make sure that column 'Nmap Name New' contains 'http', 'ServiceProtocol' contains 'tcp' and 'State'" +
+					"Make sure that column 'Service Name New' contains 'http', 'Protocol' contains 'tcp' and 'State'" +
 					"contains 'open'."
 					, "Row is not a web application ..."
 					, MessageBoxButtons.OK
@@ -519,26 +522,45 @@ namespace SharpBurp
 				}
 				else
 				{
-					this.cancelWorker.Visible = false;
-					// Add parsed items to DataGridView
-					this.progressBar.Maximum = backgroundWorker.ScanLoader.Count;
-					this.progressBar.Step = 1;
-					this.progressBar.Value = 0;
-					foreach (ScanLib.ScanEntry item in backgroundWorker.ScanLoader)
+					try
 					{
-						results.Add(item);
-						this.progressBar.PerformStep();
+						this.cancelWorker.Visible = false;
+						// Add parsed items to DataGridView
+						this.progressBar.Maximum = backgroundWorker.ScanLoader.Count;
+						this.progressBar.Step = 1;
+						this.progressBar.Value = 0;
+						// Report caught exceptions
+						foreach (var exception in backgroundWorker.ScanLoader.Exceptions)
+						{
+							this.LogMessage(exception);
+						}
+						// Update table
+						foreach (ScanLib.ScanEntry item in backgroundWorker.ScanLoader)
+						{
+							results.Add(item);
+							this.progressBar.PerformStep();
+						}
+						this.statusMessage.Text = "Import completed";
+						this.UpdateServiceCount();
+						MessageBox.Show(this
+							, "Scan results import successfully completed."
+							, "Import complete ..."
+							, MessageBoxButtons.OK
+							, MessageBoxIcon.Information);
 					}
-					this.statusMessage.Text = "Import completed";
-					this.UpdateServiceCount();
-					MessageBox.Show(this
-						, "Scan results import successfully completed."
-						, "Import complete ..."
-						, MessageBoxButtons.OK
-						, MessageBoxIcon.Information);
+					catch (Exception ex)
+					{
+						this.LogMessage(ex);
+						MessageBox.Show(this
+							, "Loading scan results failed"
+							, "Import failed ..."
+							, MessageBoxButtons.OK
+							, MessageBoxIcon.Error);
+					}
 				}
 			}
 			this.progressBar.Value = 0;
+			this.services.Enabled = true;
 		}
 
 		private void ScanLoaderProgressChanged(object sender, ProgressChangedEventArgs e)

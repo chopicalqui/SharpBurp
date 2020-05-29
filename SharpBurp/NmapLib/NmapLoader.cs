@@ -31,13 +31,13 @@ namespace ScanLib
 				XmlNode nodeScript = nodePort.SelectSingleNode("script[@id='fingerprint-strings']");
 				string state = this.GetAttributeString(nodeState, "state");
 				string serviceName = this.GetAttributeString(nodeService, "name");
-				string serviceNameNew = serviceName;
+				string serviceNameNew = this.GetAttributeString(nodeService, "name");
 				string product = this.GetAttributeString(nodeService, "product");
 				string tunnel = this.GetAttributeString(nodeService, "tunnel");
 				string osType = this.GetAttributeString(nodeService, "ostype");
 				string version = this.GetAttributeString(nodeService, "version");
 				bool tls = !string.IsNullOrEmpty(tunnel) && tunnel == "ssl";
-				int convidence = this.GetAttributeInt(nodeService, "conf");
+				int confidence = this.GetAttributeInt(nodeService, "conf");
 				string productVersion = null;
 				string scriptOutput = this.GetAttributeString(nodeScript, "output");
 
@@ -50,7 +50,7 @@ namespace ScanLib
 				{
 					serviceNameNew = "http";
 				}
-				if (!string.IsNullOrEmpty(scriptOutput))
+				if (serviceNameNew != "http" && !string.IsNullOrEmpty(scriptOutput))
 				{
 					if (this.HttpResponseRegex.IsMatch(scriptOutput))
 						serviceNameNew = "http";
@@ -74,7 +74,7 @@ namespace ScanLib
 					, serviceName
 					, productVersion
 					, tls
-					, convidence
+					, confidence
 					, osType
 					, this.Source);
 				if (nmapEntry.HasState(this.States))

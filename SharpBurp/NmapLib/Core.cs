@@ -41,7 +41,7 @@ namespace ScanLib
 		private ServiceState state;
 		public int Port { get; set; }
 		public bool Tls { get; set; }
-		private string nmapNameNew { get; set; }
+		private string nmapNameNew;
 		public string NmapNameOriginal { get; }
 		public string Version { get; }
 		public int Confidence { get; }
@@ -103,8 +103,8 @@ namespace ScanLib
 			else
 				throw new NotImplementedException(String.Format("Service state '{0}' not implemented.", state));
 			this.Port = port;
-			this.NmapNameNew = confidence != 10 && !string.IsNullOrEmpty(nmapNameNew) ? nmapNameNew + "?" : nmapNameNew;
-			this.NmapNameOriginal = confidence != 10 && !string.IsNullOrEmpty(nmapNameOriginal) ? nmapNameOriginal + "?" : nmapNameOriginal;
+			this.NmapNameNew = nmapNameNew;
+			this.NmapNameOriginal = confidence != 10 && !string.IsNullOrEmpty(nmapNameOriginal) ? String.Format("{0}?", nmapNameOriginal) : nmapNameOriginal;
 			this.Version = version;
 			this.Confidence = confidence;
 			this.OsType = osType;
@@ -180,7 +180,7 @@ namespace ScanLib
 
 		public bool IsScanable()
 		{
-			return this.NmapNameNew == "http" && this.State == ServiceState.open && this.Protocol == ServiceProtocol.tcp;
+			return (this.NmapNameNew == "http" || this.NmapNameNew == "https") && this.State == ServiceState.open && this.Protocol == ServiceProtocol.tcp;
 		}
 
 		public bool HasState(List<ServiceState> states)
@@ -196,17 +196,32 @@ namespace ScanLib
 	{
 		public XmlScanLoaderBase ScanLoader { get; }
 
+		protected List<Exception> exceptions { get; set; }
+
 		public ScanLoaderBackgroundWorker()
 		{
 			this.WorkerSupportsCancellation = true;
 			this.WorkerReportsProgress = true;
 			this.ScanLoader = null;
+			this.exceptions = new List<Exception>();
 		}
 		
+		public List<Exception> Exceptions
+		{
+			get { return this.exceptions; }
+		}
+
 		public ScanLoaderBackgroundWorker(XmlScanLoaderBase nmapLoader) : this()
 		{
-			this.ScanLoader = nmapLoader;
-			this.DoWork += new DoWorkEventHandler(this.ScanLoader.LoadXml);
+			try
+			{
+				this.ScanLoader = nmapLoader;
+				this.DoWork += new DoWorkEventHandler(this.ScanLoader.LoadXml);
+			}
+			catch (Exception ex)
+			{
+				this.exceptions.Add(ex);
+			}
 		}
 	}
 
@@ -239,6 +254,7 @@ namespace ScanLib
 		/// Pointer to the background worker-s evant arguments
 		/// </summary>
 		protected DoWorkEventArgs EventArguments { get; set; }
+		protected List<Exception> exceptions { get; set; }
 
 		public XmlScanLoaderBase(string[] files
 			, List<ServiceState> states
@@ -249,12 +265,18 @@ namespace ScanLib
 			this.Files = files;
 			this.States = states;
 			this.Source = scanSource;
+			this.exceptions = new List<Exception>();
 			if (scanSource == ScanSource.nmap)
 				this.XmlBaseBath = "/nmaprun/host";
 			else if (scanSource == ScanSource.nessus)
 				this.XmlBaseBath = "/NessusClientData_v2/Report/ReportHost";
 			else
 				throw new NotImplementedException(String.Format("Scan source '{0}' not implemented.", scanSource.ToString()));
+		}
+
+		public List<Exception> Exceptions
+		{
+			get { return this.exceptions; }
 		}
 
 		#region Helper Methods
@@ -269,8 +291,15 @@ namespace ScanLib
 				foreach (var file in this.Files)
 				{
 					var doc = new XmlDocument();
-					doc.Load(file);
-					result += doc.DocumentElement.SelectNodes(this.XmlBaseBath).Count;
+					try
+					{
+						doc.Load(file);
+						result += doc.DocumentElement.SelectNodes(this.XmlBaseBath).Count;
+					}
+					catch (Exception ex)
+					{
+						this.Exceptions.Add(new XmlException("Failed parsing file: " + file, ex));
+					}
 				}
 				return result;
 			}
@@ -365,15 +394,22 @@ namespace ScanLib
 		protected void ParseXml(string file, ref int processedHostCount, int totalHostCount)
 		{
 			var doc = new XmlDocument();
-			doc.Load(file);
-			foreach (XmlNode hostNode in doc.DocumentElement.SelectNodes(this.XmlBaseBath))
+			try
 			{
-				if (this.IsBackgroundWorkerCanceled())
-					break;
-				this.ParseXml(hostNode);
-				processedHostCount += 1;
-				if (this.BackgroundWorker != null && totalHostCount > 0)
-					this.BackgroundWorker.ReportProgress(Convert.ToInt32((processedHostCount / (float)totalHostCount) * 100));
+				doc.Load(file);
+				foreach (XmlNode hostNode in doc.DocumentElement.SelectNodes(this.XmlBaseBath))
+				{
+					if (this.IsBackgroundWorkerCanceled())
+						break;
+					this.ParseXml(hostNode);
+					processedHostCount += 1;
+					if (this.BackgroundWorker != null && totalHostCount > 0)
+						this.BackgroundWorker.ReportProgress(Convert.ToInt32((processedHostCount / (float)totalHostCount) * 100));
+				}
+			}
+			catch (Exception ex)
+			{
+				this.Exceptions.Add(new XmlException("Failed parsing file: " + file, ex));
 			}
 		}
 
