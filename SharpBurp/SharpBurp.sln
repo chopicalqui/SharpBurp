@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.27703.2035
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpBurp", "SharpBurp\SharpBurp.csproj", "{D8113C9E-1E8F-4E44-A1B4-479D0EA6202E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NmapLib", "NmapLib\NmapLib.csproj", "{DAD48919-39E8-4E97-A529-5F4889237B66}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScanLib", "NmapLib\ScanLib.csproj", "{DAD48919-39E8-4E97-A529-5F4889237B66}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurpSuiteLib", "BurpSuiteLib\BurpSuiteLib.csproj", "{14B7F046-C579-4FFE-A46C-2C58A1FFD595}"
 EndProject
